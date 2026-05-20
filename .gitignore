@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Brain Anomaly CV Project — .gitignore
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Raw data — too large, re-download from source
+data/raw/
+
+# Processed data — regenerate via preprocessing scripts
+data/processed/
+
+# Model weights, checkpoints, and W&B logs
+experiments/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# PyTorch model weights
+*.pth
+*.pt
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# API keys and credentials
+.env
+*.env
+secrets.yaml
+
+# W&B local artifacts
+wandb/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo

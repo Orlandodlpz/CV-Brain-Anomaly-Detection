@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Brain Anomaly CV Project — Python dependencies
+# Python 3.10+ required
+# Install: pip install -r requirements.txt
+#
+# NOTE: FSL and ANTs are standalone tools, NOT pip packages.
+# Install FSL from:  https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FslInstallation
+# Install ANTs from: https://stnava.github.io/ANTs
+# These are only required for Phase 4 (psychological correlates preprocessing).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Core deep learning
+torch>=2.2.0
+torchvision>=0.17.0
+
+# YOLO (segmentation model — use yolov11-seg mode only)
+ultralytics>=8.3.0
+
+# Medical imaging I/O
+SimpleITK>=2.3.0
+nibabel>=5.2.0
+pydicom>=2.4.0
+nilearn>=0.10.0
+
+# Computer vision
+opencv-python>=4.9.0
+Pillow>=10.2.0
+scikit-image>=0.22.0
+
+# ML utilities
+scikit-learn>=1.4.0
+numpy>=1.26.0
+pandas>=2.2.0
+
+# Explainability (Grad-CAM)
+captum>=0.7.0
+
+# Experiment tracking
+wandb>=0.16.0
+
+# Visualization & dashboard
+matplotlib>=3.8.0
+plotly>=5.19.0
+streamlit>=1.32.0
+
+# Metrics
+torchmetrics>=1.3.0
+
+# Config management
+PyYAML>=6.0.1
