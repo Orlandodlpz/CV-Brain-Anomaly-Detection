@@ -11,6 +11,13 @@ This is a research/portfolio project — not a clinical diagnostic tool.
 Phase 1 — Foundation & Setup (in progress)
 
 ## Last session summary
+Session 2 (2026-05-20):
+- All Phase 1 datasets downloaded into data/raw/ (gitignored — not committed).
+  Includes BraTS 2024, Kaggle brain tumor MRI (pituitary/meningioma multi-class),
+  and Kaggle brain hemorrhage segmentation dataset. Folder layout under data/raw/
+  should be confirmed at the start of next session before writing the NIfTI→YOLO
+  converter, since the converter's path logic depends on the actual folder names.
+
 Session 1 (2026-05-20):
 - Created full project folder structure (data/, src/, notebooks/, app/, configs/,
   experiments/, reports/) with .gitkeep placeholders so all dirs are tracked by Git.
@@ -29,13 +36,13 @@ Session 1 (2026-05-20):
 ## Completed milestones
 - [2026-05-20] Project scaffolded: folder structure, requirements.txt, .gitignore
 - [2026-05-20] src/preprocessing/dicom_to_png.py complete and committed
+- [2026-05-20] All Phase 1 datasets downloaded to data/raw/ (BraTS 2024,
+  Kaggle brain tumor MRI, Kaggle brain hemorrhage segmentation)
 
 ## Next task
 Phase 1 remaining work:
-1. Download datasets (see BRIEFING.md Part 6):
-   - BraTS 2024 from synapse.org (register first)
-   - Kaggle brain tumor MRI dataset (pituitary/meningioma multi-class)
-   - Kaggle brain hemorrhage segmentation dataset
+1. Inspect data/raw/ layout — record the exact subfolder names and file structure
+   of each downloaded dataset so the preprocessing scripts can target them.
 2. Build src/preprocessing/nifti_to_yolo.py — convert NIfTI ground-truth masks
    to YOLO-seg polygon annotation format
 3. Build src/preprocessing/mri_register.py — skull strip + MNI registration stub
