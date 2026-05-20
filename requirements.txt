@@ -27,6 +27,14 @@ opencv-python>=4.9.0
 Pillow>=10.2.0
 scikit-image>=0.22.0
 
+# Datasets
+kaggle>=1.6.0
+    # - Download BraTS2024-BraTS-GLI-TrainingData.zip from synapse.org
+    # - Kaggle Datasets
+    #     - kaggle datasets download -d masoudnickparvar/brain-tumor-mri-dataset -p data/raw/brain-tumor-mri --unzip
+    #     - kaggle datasets download -d vbookshelf/computed-tomography-ct-images -p data/raw/hemorrhage-ct --unzip
+
+
 # ML utilities
 scikit-learn>=1.4.0
 numpy>=1.26.0
