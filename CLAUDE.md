@@ -11,6 +11,48 @@ This is a research/portfolio project — not a clinical diagnostic tool.
 Phase 1 — Foundation & Setup (in progress)
 
 ## Last session summary
+Session 3 (2026-05-20):
+- Inspected data/raw/ and recorded the exact on-disk layout of all three Phase 1
+  datasets (see "Verified data/raw layout" section below).
+- Corrected dataset attribution: the "Kaggle brain hemorrhage segmentation"
+  dataset is actually the PhysioNet Hssayeni v1.0.0 release
+  ("computed-tomography-images-for-intracranial-hemorrhage-detection-and-
+  segmentation-1.0.0"). Same data, different distribution channel.
+- Confirmed scope of nifti_to_yolo.py: BraTS only. Hemorrhage CT is already 2D
+  JPG with paired masks and needs a separate converter. Brain-tumor-mri is
+  classification-only (no masks) and feeds the Phase 3 grading head.
+- Built src/preprocessing/nifti_to_yolo.py — full BraTS → YOLOv11-seg converter:
+    - find_brats_cases / resolve_case_files (discover + pair seg with modality)
+    - load_nifti_volume + iter_axial_slices (nibabel + np.take per axis)
+    - mask_to_polygons (cv2.findContours RETR_EXTERNAL + approxPolyDP)
+    - polygon_to_yolo_line (normalised polygon vertices)
+    - convert_case / convert_dataset (top-level batch entry points)
+    - _write_dataset_yaml (emits dataset stub for Ultralytics)
+    - Two label-mode taxonomies:
+        "combined"   → all BraTS labels collapse to class 0 (glioma)
+        "subregions" → NETC=0, SNFH=1, ET=2, RC=3
+    - CLI flags: --modality, --label-mode, --axis, --include-empty,
+                 --min-polygon-area, --approx-epsilon-frac
+- Bash sandbox unavailable this session (Windows EXDEV mount error) so
+  py_compile / a sample-case dry-run could NOT be executed remotely. User
+  ran the smoke test locally instead.
+- Built src/utils/visualization.py — YOLO-seg polygon overlay tool for QA:
+    - parse_yolo_seg_label, denormalise_polygon, overlay_yolo_seg,
+      overlay_directory + CLI (--images, --labels, --output, --limit,
+      --thickness, --alpha, --skip-empty).
+    - Per-class colour palette (BGR): 0=yellow, 1=blue, 2=green, 3=red,
+      4=magenta, 5=cyan. Reusable for hemorrhage converter QA and later
+      for visualising YOLO model predictions.
+- Smoke-tested nifti_to_yolo.py on a subset of BraTS cases:
+    - Polygons in --label-mode combined correctly trace tumor regions on T1c.
+    - Multiple disjoint polygons per slice render as expected for tumors with
+      separate necrotic / enhancing / edema components.
+    - --include-empty produces 0-byte label files; YOLO treats these as
+      negatives during training — keep them unless cleaning up.
+- Documented a PowerShell gotcha: multi-line python commands need backtick `
+  for line continuation, not bash-style backslash \. Stick to single-line
+  invocations in CLAUDE.md examples to avoid the issue across Mac + PC.
+
 Session 2 (2026-05-20):
 - All Phase 1 datasets downloaded into data/raw/ (gitignored — not committed).
   Includes BraTS 2024, Kaggle brain tumor MRI (pituitary/meningioma multi-class),
@@ -37,17 +79,68 @@ Session 1 (2026-05-20):
 - [2026-05-20] Project scaffolded: folder structure, requirements.txt, .gitignore
 - [2026-05-20] src/preprocessing/dicom_to_png.py complete and committed
 - [2026-05-20] All Phase 1 datasets downloaded to data/raw/ (BraTS 2024,
-  Kaggle brain tumor MRI, Kaggle brain hemorrhage segmentation)
+  Kaggle brain tumor MRI, PhysioNet Hssayeni hemorrhage CT v1.0.0)
+- [2026-05-20] data/raw/ layout verified and documented (see section below)
+- [2026-05-20] src/preprocessing/nifti_to_yolo.py complete (BraTS → YOLO-seg)
+- [2026-05-20] src/utils/visualization.py complete (YOLO-seg overlay viz)
+- [2026-05-20] nifti_to_yolo.py smoke test passed — polygon outlines visually
+  verified on representative BraTS cases via visualization.py overlay
+
+## Verified data/raw layout
+All paths relative to repo root. data/raw/ is gitignored.
+
+1. BraTS 2024 (glioma segmentation + multi-label grade via seg classes)
+   - Root: data/raw/training_data1_v2/
+   - One folder per case: BraTS-GLI-<id>-<timepoint>/
+     e.g. BraTS-GLI-02251-100/
+   - Files per case (5):
+     <case>-seg.nii.gz   ← ground-truth segmentation (label values 1/2/3/4)
+     <case>-t1c.nii.gz   ← T1-weighted contrast-enhanced
+     <case>-t1n.nii.gz   ← T1-weighted native
+     <case>-t2f.nii.gz   ← T2 FLAIR
+     <case>-t2w.nii.gz   ← T2-weighted
+   - Use for: YOLOv11-seg segmentation training + WHO grade derivation.
+
+2. Kaggle brain tumor MRI (Masoudnickparvar — 4-class classification, no masks)
+   - Root: data/raw/brain-tumor-mri/
+   - Layout: {Training,Testing}/{glioma,meningioma,pituitary,notumor}/*.jpg
+   - File-name prefixes: Tr-gl_*, Tr-pi_*, Tr-no_*, Tr-me_*, plus
+     Tr-aug-me_* (meningioma augmented to balance classes), and Te-*_ for test.
+   - Use for: Phase 3 grading/classification head only. Cannot feed YOLO-seg
+     (no pixel masks available).
+
+3. PhysioNet Hssayeni intracranial hemorrhage CT (v1.0.0)
+   - Root: data/raw/hemorrhage-ct/
+     computed-tomography-images-for-intracranial-hemorrhage-detection-and-
+     segmentation-1.0.0/
+   - Files at root: README.txt, LICENSE.txt, SHA256SUMS.txt,
+     hemorrhage_diagnosis.csv, patient_demographics.csv
+   - hemorrhage_diagnosis.csv columns: PatientNumber, SliceNumber,
+     Intraventricular, Intraparenchymal, Subarachnoid, Epidural, Subdural,
+     No_Hemorrhage, Fracture_Yes_No  (per-slice multi-label)
+   - Slice images: Patients_CT/<patient_id>/{bone,brain}/<slice_num>.jpg
+   - Masks: Patients_CT/<patient_id>/brain/<slice_num>_HGE_Seg.jpg
+     (present only for slices with hemorrhage)
+   - Use for: YOLOv11-seg (hemorrhage class) AND per-slice subtype labels.
+     Needs a different converter from nifti_to_yolo.py — already 2D JPG.
 
 ## Next task
 Phase 1 remaining work:
-1. Inspect data/raw/ layout — record the exact subfolder names and file structure
-   of each downloaded dataset so the preprocessing scripts can target them.
-2. Build src/preprocessing/nifti_to_yolo.py — convert NIfTI ground-truth masks
-   to YOLO-seg polygon annotation format
+1. Run the full BraTS → YOLO-seg conversion against the real output dir.
+   Single-line PowerShell-friendly invocation:
+     python -m src.preprocessing.nifti_to_yolo --input data/raw/training_data1_v2 --modality t1c --label-mode combined
+   Output lands in data/processed/anomaly/{images,labels} + dataset.yaml.
+   Expect ~50k–100k PNG/label pairs and several GB. Safe to Ctrl+C between
+   cases (atomic per case). After completion, spot-check overlays from later
+   cases with src/utils/visualization.py.
+2. Build src/preprocessing/hemorrhage_to_yolo.py — convert the Hssayeni
+   <slice>.jpg + <slice>_HGE_Seg.jpg pairs to YOLO-seg polygons. Class label
+   from hemorrhage_diagnosis.csv (per-slice subtype).
 3. Build src/preprocessing/mri_register.py — skull strip + MNI registration stub
    (full implementation deferred to Phase 4 when FSL/ANTs are installed)
-4. Design and lock the class taxonomy (anomaly classes + grade labels)
+4. Design and lock the class taxonomy (anomaly classes + grade labels) —
+   reconcile combined vs subregions label-mode with the hemorrhage subtypes
+   and the brain-tumor-mri 4-class set.
 5. Create stratified train/val/test split manifests → data/splits/
 6. Implement augmentation pipeline (horizontal flip, rotation, intensity jitter)
 
