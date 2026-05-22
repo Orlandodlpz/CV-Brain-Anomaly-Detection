@@ -85,6 +85,9 @@ Session 1 (2026-05-20):
 - [2026-05-20] src/utils/visualization.py complete (YOLO-seg overlay viz)
 - [2026-05-20] nifti_to_yolo.py smoke test passed — polygon outlines visually
   verified on representative BraTS cases via visualization.py overlay
+- [2026-05-21] README.md added at repo root — public-facing overview, install
+  instructions, dataset acquisition guide, and usage examples for all
+  scripts shipped to date (dicom_to_png, nifti_to_yolo, visualization)
 
 ## Verified data/raw layout
 All paths relative to repo root. data/raw/ is gitignored.
