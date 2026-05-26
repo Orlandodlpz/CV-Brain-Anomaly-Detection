@@ -28,11 +28,13 @@ Shipped so far:
 - `src/preprocessing/dicom_to_png.py` — DICOM series → normalised 2D PNG slices
 - `src/preprocessing/nifti_to_yolo.py` — BraTS NIfTI volumes → YOLOv11-seg
   polygon dataset
+- `src/preprocessing/hemorrhage_to_yolo.py` — PhysioNet Hssayeni CT slices +
+  hemorrhage masks → YOLOv11-seg polygon dataset (class id 1, alongside glioma=0)
 - `src/utils/visualization.py` — YOLO-seg polygon overlay tool for QA
-- Phase 1 datasets downloaded into `data/raw/` (BraTS 2024, Kaggle brain
-  tumor MRI, PhysioNet Hssayeni hemorrhage CT)
-- BraTS converter smoke-tested — polygon outlines visually verified against
-  T1c slices
+- `data/processed/anomaly/dataset.yaml` — unified class taxonomy (glioma=0, hemorrhage=1)
+- Phase 1 datasets downloaded and **fully converted**:
+  - BraTS 2024 → `data/processed/anomaly/` (glioma, class 0)
+  - PhysioNet Hssayeni hemorrhage CT → `data/processed/anomaly/` (318 positive slices, class 1)
 
 See [Roadmap](#roadmap) for what's next.
 
@@ -59,6 +61,7 @@ brain-cv-project/
 │   ├── preprocessing/
 │   │   ├── dicom_to_png.py
 │   │   ├── nifti_to_yolo.py
+│   │   ├── hemorrhage_to_yolo.py
 │   │   └── mri_register.py      (Phase 4)
 │   ├── models/
 │   │   ├── segmentation/        (Phase 2)
@@ -236,16 +239,45 @@ Class colours cycle through a fixed palette (BGR): yellow, blue, green, red,
 magenta, cyan — so in `--label-mode subregions` each tumor sub-region is
 visible as a distinct colour.
 
+### `src/preprocessing/hemorrhage_to_yolo.py`
+
+Converts the PhysioNet Hssayeni intracranial hemorrhage CT dataset into the
+same YOLO-seg format as `nifti_to_yolo.py`. Reads `hemorrhage_diagnosis.csv`
+for per-slice multi-label annotations and pairs each brain CT slice with its
+`_HGE_Seg.jpg` binary mask.
+
+```
+python -m src.preprocessing.hemorrhage_to_yolo --input "data/raw/hemorrhage-ct/computed-tomography-images-for-intracranial-hemorrhage-detection-and-segmentation-1.0.0" --output data/processed/anomaly --label-mode combined --combined-class-id 1
+```
+
+Output lands in the same `data/processed/anomaly/{images,labels}/` directory
+as the BraTS output — filenames never collide (BraTS stems start with
+`BraTS-GLI-…`, hemorrhage stems are `NNNN_sliceNNNN`).
+
+Useful flags:
+
+- `--label-mode {combined,subtypes}` — `combined` maps all hemorrhage to a
+  single class; `subtypes` uses per-subtype class ids
+  (Intraventricular=0 … Subdural=4).
+- `--combined-class-id N` — YOLO class id for hemorrhage in combined mode
+  (default `1` to sit alongside glioma=0).
+- `--include-empty` — also write negative (no-hemorrhage) slices.
+- `--min-polygon-area`, `--approx-epsilon-frac` — same polygon knobs as
+  `nifti_to_yolo.py`.
+
 ### End-to-end Phase 1 walkthrough
 
 ```
-# 1. Convert BraTS NIfTI volumes to a YOLO-seg dataset
+# 1. Convert BraTS NIfTI volumes → YOLO-seg (glioma, class 0)
 python -m src.preprocessing.nifti_to_yolo --input data/raw/training_data1_v2 --modality t1c --label-mode combined
 
-# 2. Spot-check a few overlays
+# 2. Convert Hssayeni hemorrhage CT → YOLO-seg (hemorrhage, class 1)
+python -m src.preprocessing.hemorrhage_to_yolo --input "data/raw/hemorrhage-ct/computed-tomography-images-for-intracranial-hemorrhage-detection-and-segmentation-1.0.0" --output data/processed/anomaly --label-mode combined --combined-class-id 1
+
+# 3. Spot-check a few overlays
 python -m src.utils.visualization --images data/processed/anomaly/images --labels data/processed/anomaly/labels --output data/processed/anomaly/overlays --limit 30
 
-# 3. (Phase 2 onward — converters for hemorrhage CT, splits, augmentation, training)
+# 4. (Next — train/val/test split manifests, augmentation pipeline, training)
 ```
 
 > **PowerShell note:** these are single-line commands so they paste cleanly

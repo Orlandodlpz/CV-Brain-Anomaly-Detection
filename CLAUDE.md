@@ -11,6 +11,27 @@ This is a research/portfolio project — not a clinical diagnostic tool.
 Phase 1 — Foundation & Setup (in progress)
 
 ## Last session summary
+Session 4 (2026-05-25):
+- Built src/preprocessing/hemorrhage_to_yolo.py — converts PhysioNet Hssayeni
+  CT hemorrhage dataset (2D JPGs + binary masks + CSV labels) to YOLO-seg format:
+    - load_diagnosis_csv (validates CSV columns)
+    - resolve_slice_paths (patient_id / slice_num → brain JPG + mask JPG paths)
+    - mask_to_polygons + polygon_to_yolo_line (same logic as nifti_to_yolo)
+    - convert_slice (single slice: min-max normalise CT → PNG + label)
+    - convert_dataset (iterates all CSV rows, handles positives/negatives)
+    - _write_dataset_yaml (does NOT overwrite existing yaml from nifti_to_yolo)
+    - Two label modes:
+        "combined"  → all hemorrhage → configurable class id (default 1,
+                       so glioma=0, hemorrhage=1 in the unified dataset)
+        "subtypes"  → Intraventricular=0, Intraparenchymal=1, Subarachnoid=2,
+                       Epidural=3, Subdural=4; multi-label slices emit one
+                       polygon per active subtype (same spatial mask, different
+                       class id — acknowledged approximation, no per-subtype masks)
+    - CLI flags: --input, --output, --label-mode, --combined-class-id,
+                 --include-empty, --min-polygon-area, --approx-epsilon-frac
+- BraTS full conversion: user should run locally (command in "Next task" below).
+  hemorrhage_to_yolo.py should be smoke-tested on a few patients after BraTS run.
+
 Session 3 (2026-05-20):
 - Inspected data/raw/ and recorded the exact on-disk layout of all three Phase 1
   datasets (see "Verified data/raw layout" section below).
@@ -88,6 +109,13 @@ Session 1 (2026-05-20):
 - [2026-05-21] README.md added at repo root — public-facing overview, install
   instructions, dataset acquisition guide, and usage examples for all
   scripts shipped to date (dicom_to_png, nifti_to_yolo, visualization)
+- [2026-05-25] src/preprocessing/hemorrhage_to_yolo.py complete (Hssayeni CT → YOLO-seg)
+- [2026-05-25] Full BraTS → YOLO-seg conversion complete (data/processed/anomaly/)
+- [2026-05-25] Hemorrhage CT conversion complete — 318 positive slices written,
+  2183 negative slices skipped (class id 1, combined mode, alongside glioma=0)
+- [2026-05-26] data/processed/psych/ directory created — Phase 4 placeholder per
+  BRIEFING Part 7 layout (will hold skull-stripped, MNI-registered slices for the
+  ADHD/ASD/Control classifier; populated in Phase 4)
 
 ## Verified data/raw layout
 All paths relative to repo root. data/raw/ is gitignored.
@@ -129,16 +157,8 @@ All paths relative to repo root. data/raw/ is gitignored.
 
 ## Next task
 Phase 1 remaining work:
-1. Run the full BraTS → YOLO-seg conversion against the real output dir.
-   Single-line PowerShell-friendly invocation:
-     python -m src.preprocessing.nifti_to_yolo --input data/raw/training_data1_v2 --modality t1c --label-mode combined
-   Output lands in data/processed/anomaly/{images,labels} + dataset.yaml.
-   Expect ~50k–100k PNG/label pairs and several GB. Safe to Ctrl+C between
-   cases (atomic per case). After completion, spot-check overlays from later
-   cases with src/utils/visualization.py.
-2. Build src/preprocessing/hemorrhage_to_yolo.py — convert the Hssayeni
-   <slice>.jpg + <slice>_HGE_Seg.jpg pairs to YOLO-seg polygons. Class label
-   from hemorrhage_diagnosis.csv (per-slice subtype).
+1. ✅ BraTS full conversion complete
+2. ✅ Hemorrhage CT conversion complete (318 positive slices, class id 1)
 3. Build src/preprocessing/mri_register.py — skull strip + MNI registration stub
    (full implementation deferred to Phase 4 when FSL/ANTs are installed)
 4. Design and lock the class taxonomy (anomaly classes + grade labels) —
@@ -189,3 +209,10 @@ When resuming on the other machine, always run git pull before starting.
 2. Ask "Should I update CLAUDE.md?" after every 5 user prompts
 3. Always update at end of session when the user signals they are done
 4. Always commit and push CLAUDE.md immediately after updating it
+
+## File summary rule
+After every file creation, edit, or fix — always post a detailed summary in chat:
+- List every function / class in the file
+- For each: what it does, its inputs, its outputs, and any important behaviour
+- Note any design decisions or approximations made
+- This applies to ALL file types: .py, .yaml, .md, configs, etc.
