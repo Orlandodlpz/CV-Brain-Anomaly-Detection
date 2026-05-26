@@ -116,6 +116,35 @@ Session 1 (2026-05-20):
 - [2026-05-26] data/processed/psych/ directory created — Phase 4 placeholder per
   BRIEFING Part 7 layout (will hold skull-stripped, MNI-registered slices for the
   ADHD/ASD/Control classifier; populated in Phase 4)
+- [2026-05-26] Class taxonomy locked → configs/taxonomy.yaml (single source of
+  truth for all four learnable tasks: yolo_seg, tumor_type_classifier,
+  glioma_grade_classifier, psych_classifier — see "Locked taxonomy" section)
+
+## Locked taxonomy (configs/taxonomy.yaml is canonical — do not redefine here)
+Class IDs are scoped per task. Same integer in different tasks means different
+things. Always load from configs/taxonomy.yaml, never hardcode.
+
+  yolo_seg (Phase 2 — pixel segmentation, YOLOv11-seg):
+    0 = glioma          (BraTS 2024, combined mode)
+    1 = hemorrhage      (Hssayeni CT, combined mode)
+    deferred: meningioma, pituitary, stroke_lesion (no mask data on disk)
+
+  tumor_type_classifier (Phase 3a — CNN head on brain-tumor-mri):
+    0 = glioma   1 = meningioma   2 = pituitary   3 = notumor
+
+  glioma_grade_classifier (Phase 3b — CNN head on BraTS HGG/LGG):
+    0 = lgg (WHO I-II)   1 = hgg (WHO III-IV)
+
+  severity_metrics (Phase 3 — computed, not classified):
+    volume_mm3, circularity_index, bounding_box_aspect_ratio
+
+  psych_classifier (Phase 4 — probability distribution, never single label):
+    0 = control   1 = adhd   2 = asd
+    optional extensions: ocd, schizophrenia (only if data permits)
+
+Subregions (BraTS NETC/SNFH/ET/RC) and hemorrhage subtypes
+(Intraventricular/Intraparenchymal/Subarachnoid/Epidural/Subdural) are
+deferred to a possible Phase 2.5 variant — not in v1.
 
 ## Verified data/raw layout
 All paths relative to repo root. data/raw/ is gitignored.
@@ -159,12 +188,12 @@ All paths relative to repo root. data/raw/ is gitignored.
 Phase 1 remaining work:
 1. ✅ BraTS full conversion complete
 2. ✅ Hemorrhage CT conversion complete (318 positive slices, class id 1)
-3. Build src/preprocessing/mri_register.py — skull strip + MNI registration stub
+3. ✅ Class taxonomy locked → configs/taxonomy.yaml
+4. Build src/preprocessing/mri_register.py — skull strip + MNI registration stub
    (full implementation deferred to Phase 4 when FSL/ANTs are installed)
-4. Design and lock the class taxonomy (anomaly classes + grade labels) —
-   reconcile combined vs subregions label-mode with the hemorrhage subtypes
-   and the brain-tumor-mri 4-class set.
 5. Create stratified train/val/test split manifests → data/splits/
+   (now unblocked — taxonomy locked; stratify on yolo_seg classes for the
+   anomaly splits and on psych_classifier classes for Phase 4 splits)
 6. Implement augmentation pipeline (horizontal flip, rotation, intensity jitter)
 
 ## Key decisions (do not change without discussing first)

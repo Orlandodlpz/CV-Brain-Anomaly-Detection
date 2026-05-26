@@ -1,0 +1,133 @@
+# Brain Anomaly CV Project — Class Taxonomy
+#
+# Single source of truth for class IDs across all four learnable tasks in this
+# project. Every converter, split manifest, training script, and inference call
+# MUST load IDs from this file rather than hardcoding integers. If a class ID
+# needs to change, change it here and re-run downstream pipelines.
+#
+# Locked: 2026-05-26 (Phase 1).
+# See BRIEFING.md Part 4 for the architectural decisions this implements.
+
+# ---------------------------------------------------------------------------
+# Layer 1 — Pixel-level segmentation (Phase 2)
+# ---------------------------------------------------------------------------
+# Model: YOLOv11-seg. Multi-class segmentation on 2D axial slices.
+# Class IDs match the existing data/processed/anomaly/ output of
+# nifti_to_yolo.py (combined mode) and hemorrhage_to_yolo.py (combined mode,
+# default --combined-class-id 1). No reprocessing needed to align.
+#
+# Subregions (BraTS NETC/SNFH/ET/RC) and subtypes (Hssayeni Intraventricular/
+# Intraparenchymal/Subarachnoid/Epidural/Subdural) are intentionally collapsed
+# into the parent class for v1. A Phase 2.5 variant may re-expose them once the
+# base 2-class model is calibrated; see notes below.
+yolo_seg:
+  classes:
+    0: glioma
+    1: hemorrhage
+  source_datasets:
+    - brats_2024            # data/raw/training_data1_v2/   (combined mode → 0)
+    - hssayeni_hemorrhage   # data/raw/hemorrhage-ct/       (combined mode → 1)
+  notes: |
+    Combined-mode mapping. BraTS subregion labels (1/2/3/4) all collapse to
+    class 0 (glioma). Hssayeni per-subtype labels all collapse to class 1
+    (hemorrhage). The converters keep multi-label slices as multiple polygons
+    in the same YOLO label file when relevant.
+
+# Deferred segmentation classes — not in v1 because no mask-bearing dataset
+# is on disk for them. Listed here so future sessions know the scope was
+# narrowed by data availability, not by design.
+yolo_seg_deferred:
+  - name: meningioma
+    reason: "brain-tumor-mri is classification-only (no masks). Candidate mask source: Figshare brain-tumor dataset."
+  - name: pituitary
+    reason: "Same as meningioma — no masks in current data/raw."
+  - name: stroke_lesion
+    reason: "No stroke dataset downloaded yet. Candidate: ISLES 2022."
+
+# ---------------------------------------------------------------------------
+# Layer 2a — Tumor-type classifier (Phase 3)
+# ---------------------------------------------------------------------------
+# Model: CNN head (ResNet50 or EfficientNet-B2) on full slice or ROI crop.
+# Independent from yolo_seg class IDs — this head only runs on the
+# brain-tumor-mri Kaggle dataset (Masoudnickparvar 4-class), which has no
+# pixel masks.
+tumor_type_classifier:
+  classes:
+    0: glioma
+    1: meningioma
+    2: pituitary
+    3: notumor
+  source_dataset: brain_tumor_mri   # data/raw/brain-tumor-mri/{Training,Testing}/
+  notes: |
+    The label "glioma" here refers to the brain-tumor-mri folder, not the
+    BraTS cohort. These two glioma populations are not interchangeable for
+    training — different scanners, different modalities, different label
+    granularity. Treat as separate distributions.
+
+# ---------------------------------------------------------------------------
+# Layer 2b — Glioma grade classifier (Phase 3)
+# ---------------------------------------------------------------------------
+# Model: CNN head fed masked ROI crops from YOLOv11-seg glioma output.
+# Runs ONLY on slices whose seg class is glioma (id 0 in yolo_seg).
+# Trained on BraTS cases stratified by grade label.
+glioma_grade_classifier:
+  classes:
+    0: lgg   # WHO Grade I-II   (Low-Grade Glioma)
+    1: hgg   # WHO Grade III-IV (High-Grade Glioma)
+  source_dataset: brats_2024
+  derivation: "BraTS per-case grade label (HGG/LGG) from challenge metadata. Slices inherit the case-level grade."
+  notes: |
+    A two-head design is intentional — combining tumor_type and
+    glioma_grade into a single classifier would require label imputation
+    across mutually exclusive datasets (brain-tumor-mri has no grade
+    labels, BraTS has no meningioma/pituitary cases).
+
+# ---------------------------------------------------------------------------
+# Layer 2c — Severity (computed, not classified)
+# ---------------------------------------------------------------------------
+# Continuous outputs derived from the YOLO-seg mask. No class IDs.
+severity_metrics:
+  - name: volume_mm3
+    derivation: "mask_pixel_area * pixel_spacing_x * pixel_spacing_y * slice_thickness, summed across slices per lesion instance"
+  - name: circularity_index
+    derivation: "4 * pi * area / perimeter^2, computed per polygon contour"
+  - name: bounding_box_aspect_ratio
+    derivation: "longest_axis / shortest_axis from mask bounding box"
+
+# ---------------------------------------------------------------------------
+# Layer 3 — Psychological correlate classifier (Phase 4)
+# ---------------------------------------------------------------------------
+# Model: separate CNN on skull-stripped, MNI-registered structural MRI.
+# Output is ALWAYS a probability distribution — never a single predicted
+# label. This is a hard framing rule (see BRIEFING.md Part 4).
+psych_classifier:
+  classes:
+    0: control
+    1: adhd
+    2: asd
+  output_format: probability_distribution
+  output_example:
+    control_probability: 0.10
+    adhd_probability: 0.72
+    asd_probability: 0.18
+  optional_extensions:
+    - ocd
+    - schizophrenia
+  source_datasets:
+    - adhd_200          # Control + ADHD
+    - abide_1_and_2     # Control + ASD
+    - openneuro_ds000030  # Control + ADHD + bipolar + schizophrenia (optional extension)
+  notes: |
+    Optional extensions are only added if (a) the dataset access agreement
+    is approved and (b) the per-class sample count survives QC and split.
+    Adding a class requires re-locking this file and re-running splits.
+
+# ---------------------------------------------------------------------------
+# Cross-task invariants
+# ---------------------------------------------------------------------------
+# These rules apply to ALL code that consumes this taxonomy.
+invariants:
+  - "Class IDs are scoped per task. A '0' in yolo_seg (glioma) is unrelated to a '0' in psych_classifier (control)."
+  - "Never hardcode class IDs in Python — always load from this YAML."
+  - "Adding or removing a class requires re-running affected splits and retraining."
+  - "Psych outputs are always probability distributions — code that produces a single argmax label for a user-facing output is a bug."
