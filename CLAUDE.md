@@ -11,6 +11,66 @@ This is a research/portfolio project — not a clinical diagnostic tool.
 Phase 1 — Foundation & Setup (in progress)
 
 ## Last session summary
+Session 5 (2026-05-26):
+- Re-read CLAUDE.md and BRIEFING.md at session start. Reconciled two flagged
+  drift points with user: (a) BRIEFING Part 6 dataset is already implemented
+  as data/raw/brain-tumor-mri/ (Masoudnickparvar 4-class Kaggle set — same as
+  documented in "Verified data/raw layout"); (b) data/processed/psych/ folder
+  per BRIEFING Part 7 has been created (Phase 4 placeholder).
+- Locked the class taxonomy → configs/taxonomy.yaml (single source of truth
+  for all four learnable tasks). Seven top-level keys:
+    - yolo_seg (2 classes):  glioma=0, hemorrhage=1
+      Sources: brats_2024 (combined mode), hssayeni_hemorrhage (combined mode,
+      --combined-class-id=1). Matches what is already on disk in
+      data/processed/anomaly/ — no reprocessing needed.
+    - yolo_seg_deferred: meningioma, pituitary, stroke_lesion. Each with a
+      `reason` field documenting which mask dataset is missing and a candidate
+      source (Figshare brain-tumor for meningioma/pituitary, ISLES 2022 for
+      stroke). Listed so future sessions know the scope was narrowed by data
+      availability, not by design.
+    - tumor_type_classifier (4 classes): glioma=0, meningioma=1, pituitary=2,
+      notumor=3. Sole source: brain_tumor_mri Kaggle set. Note in the YAML
+      flags that this "glioma" population is NOT interchangeable with the
+      BraTS glioma cohort (different scanners/modalities/granularity).
+    - glioma_grade_classifier (2 classes): lgg=0 (WHO I-II), hgg=1 (WHO III-IV).
+      Source: brats_2024 case-level grade label. Slices inherit case grade.
+    - severity_metrics (continuous, not classified):
+      volume_mm3, circularity_index, bounding_box_aspect_ratio. Each with a
+      `derivation` field giving the formula.
+    - psych_classifier (3 base + 2 optional): control=0, adhd=1, asd=2;
+      optional_extensions: [ocd, schizophrenia]. output_format locked as
+      probability_distribution with a literal output_example block showing
+      canonical key names (control_probability, adhd_probability, asd_probability).
+    - invariants: four rules every consumer must obey — scoped per-task IDs,
+      no hardcoded integers in Python, re-split on taxonomy change, never
+      produce single-argmax label for psych user-facing output.
+- Key design decisions baked into the lock (recorded so they survive
+  future re-opens):
+    - 2-class seg in v1 (not 9). Subregions (BraTS NETC/SNFH/ET/RC) and
+      subtypes (Hssayeni Intraventricular/Intraparenchymal/Subarachnoid/
+      Epidural/Subdural) deferred to a possible Phase 2.5 variant if v1
+      calibrates well. Rationale: BraTS subregions overlap/nest; Hssayeni
+      subtypes share a single mask per slice (already an approximation in
+      the converter); clean 2-class problem gives clean per-class metrics.
+    - Two separate grading heads, NOT a single multi-task head.
+      brain-tumor-mri has no grade labels, BraTS has no meningioma/pituitary
+      cases — a combined head would force label imputation across mutually
+      exclusive distributions.
+    - Severity stays continuous (volume/circularity/aspect ratio from the
+      mask) — preserves resolution vs. an artificial mild/moderate/severe bin.
+- CLAUDE.md updated with:
+    - New "Locked taxonomy" section mirroring the YAML in plain text so
+      future sessions see the structure in auto-loaded context without
+      having to open configs/taxonomy.yaml.
+    - Two new "Completed milestones" entries (data/processed/psych created,
+      taxonomy locked).
+    - "Next task" list updated — item 3 marked ✅, splits item flagged as
+      now unblocked (stratify on yolo_seg classes for anomaly, on
+      psych_classifier classes for Phase 4).
+- Bash sandbox unavailable again this session (Windows EXDEV mount error,
+  same as Session 3). YAML parse verification was run locally by user —
+  passed, taxonomy.yaml loads cleanly.
+
 Session 4 (2026-05-25):
 - Built src/preprocessing/hemorrhage_to_yolo.py — converts PhysioNet Hssayeni
   CT hemorrhage dataset (2D JPGs + binary masks + CSV labels) to YOLO-seg format:

@@ -130,4 +130,4 @@ invariants:
   - "Class IDs are scoped per task. A '0' in yolo_seg (glioma) is unrelated to a '0' in psych_classifier (control)."
   - "Never hardcode class IDs in Python — always load from this YAML."
   - "Adding or removing a class requires re-running affected splits and retraining."
-  - "Psych outputs are always probability distributions — code that produces a single argmax label for a user-facing output is a bug."
+  - "Psych outputs are always probability distributions: code that produces a single argmax label for a user-facing output is a bug."
